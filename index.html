@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سيستم عماد صموئيل لرصد درجات أعمال السنة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .table-container {
+            width: 100%;
+            max-height: 65vh; 
+            overflow: auto; 
+            position: relative;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+        }
+        #gradesTable, #comprehensiveTable {
+            width: 100%;
+            table-layout: auto; 
+            border-collapse: collapse;
+        }
+        .table-container::-webkit-scrollbar { width: 10px; height: 10px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-container::-webkit-scrollbar-thumb { background: #888; border-radius: 5px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        thead th { position: sticky; top: 0; z-index: 10; }
+        .sticky-col-1 { position: sticky; right: 0; z-index: 5; }
+        .sticky-col-2 { position: sticky; right: 35px; z-index: 5; }
+        thead .sticky-col-1, thead .sticky-col-2 { z-index: 15; }
+        
+        .grade-input { width: 45px; padding: 4px !important; font-size: 12px !important; }
+        .head-input { width: 100%; min-width: 45px; padding: 4px !important; font-size: 10px !important; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- 1. شاشة التفعيل -->
+    <div id="licenseScreen" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">تفعيل البرنامج</h2>
+            <p class="text-gray-500 mb-6">الرجاء إدخال كود التفعيل المخصص لمدرستكم.</p>
+            <textarea id="licenseInput" class="w-full p-3 border rounded-xl mb-4 text-center text-sm tracking-widest focus:ring-2 focus:ring-yellow-500 h-24" placeholder="ضع كود التفعيل هنا..."></textarea>
+            <button onclick="activateLicense()" class="w-full bg-yellow-500 text-white p-3 rounded-xl font-bold hover:bg-yellow-600 text-lg">تفعيل</button>
+            <p id="licenseError" class="text-red-500 mt-3 hidden font-semibold">كود التفعيل غير صحيح!</p>
+        </div>
+    </div>
+
+    <!-- 2. إعداد كلمة مرور المدير -->
+    <div id="adminSetupScreen" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">إعداد صلاحيات المدير</h2>
+            <p class="text-gray-500 mb-6 text-sm">الرجاء إدخال كلمة مرور سرية خاصة بالمدير.</p>
+            <input type="password" id="setupAdminPass" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-red-500 mb-4 text-center" placeholder="كلمة مرور المدير">
+            <button onclick="saveAdminPass()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700">حفظ واستخدام البرنامج</button>
+        </div>
+    </div>
+
+    <!-- 3. شاشة القفل -->
+    <div id="loginScreen" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-blue-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">البرنامج محمي</h2>
+            <p class="text-gray-500 mb-6">الرجاء إدخال كلمة مرور المعلمين للدخول</p>
+            <input type="password" id="passwordInput" class="w-full p-3 border rounded-xl mb-4 text-center text-2xl tracking-widest focus:ring-2 focus:ring-blue-500" placeholder="••••">
+            <button onclick="tryLogin()" class="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 text-lg">دخول</button>
+            <p id="loginError" class="text-red-500 mt-3 hidden font-semibold">كلمة المرور غير صحيحة!</p>
+            <button onclick="cancelLogout()" class="w-full mt-4 text-gray-500 font-semibold py-2 hover:text-gray-800 transition">إلغاء والعودة للبرنامج</button>
+            <hr class="my-4">
+            <button onclick="tryOpenParentPortal()" class="w-full bg-green-100 text-green-700 font-bold py-2 rounded-lg hover:bg-green-200 transition">🧑‍🤝‍🧑 بوابة أولياء الأمور</button>
+        </div>
+    </div>
+
+    <!-- 4. شاشة الإعدادات -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-40 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">الإعدادات</h3>
+            
+            <div id="ownerTools" class="hidden bg-green-50 p-4 rounded-xl mb-6 border border-green-200">
+                <h4 class="font-bold text-green-800 mb-2">مولد أكواد البيع (للمالك)</h4>
+                <div class="space-y-2 mb-3">
+                    <select id="licenseDays" class="w-full p-2 border rounded-lg" onchange="toggleTrialInputs()">
+                        <option value="2">نسخة تجريبية (يومان)</option>
+                        <option value="3">نسخة تجريبية (3 أيام)</option>
+                        <option value="30">اشتراك شهر (30 يوم)</option>
+                        <option value="365">اشتراك سنة (365 يوم)</option>
+                    </select>
+                    <div id="trialInfoHide" class="hidden space-y-2">
+                        <input type="text" id="genSchoolName" class="w-full p-2 border rounded-lg" placeholder="اسم المدرسة">
+                        <input type="text" id="genAdminName" class="w-full p-2 border rounded-lg" placeholder="اسم الإدارة التعليمية">
+                    </div>
+                </div>
+                <button onclick="generateKey()" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 mb-2">توليد الكود</button>
+                <textarea id="generatedKey" class="w-full p-2 border-2 border-dashed border-green-400 rounded-lg text-center font-bold text-green-700 bg-white h-20" readonly placeholder="الكود سيظهر هنا"></textarea>
+                <button onclick="copyKey()" class="text-xs text-blue-600 hover:underline mt-1">نسخ الكود</button>
+            </div>
+
+            <div class="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-200">
+                <h4 class="font-bold text-blue-800 mb-2">💾 النسخ الاحتياطي والدمج</h4>
+                <button onclick="backupData()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 mb-2">📤 حفظ نسخة احتياطية</button>
+                <label class="w-full bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 cursor-pointer text-center block">
+                    📥 استيراد ودمج درجات معلم
+                    <input type="file" id="restoreFileInput" class="hidden" accept=".json">
+                </label>
+            </div>
+
+            <hr class="my-4">
+            <button onclick="clearDataPrompt()" class="w-full bg-red-100 text-red-700 font-bold py-2 rounded-lg hover:bg-red-200">تصفير النظام (مسح جميع الطلاب)</button>
+            <button onclick="safeLogout()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-900 mt-4">حفظ البيانات وقفل البرنامج</button>
+            <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="w-full text-gray-400 font-bold py-2 hover:text-gray-600 mt-2">إغلاق الإعدادات</button>
+        </div>
+    </div>
+
+    <!-- 5. نافذة الكشف الشامل -->
+    <div id="comprehensiveModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-40 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">الكشف الشامل لدرجات شهر: <span id="compMonthLabel" class="text-indigo-600">-</span></h3>
+                <div class="flex gap-2">
+                    <button onclick="exportComprehensiveToExcel()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-semibold text-sm">💾 تصدير Excel</button>
+                    <button onclick="document.getElementById('comprehensiveModal').classList.add('hidden')" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400 font-semibold text-sm">إغلاق</button>
+                </div>
+            </div>
+            <div class="table-container flex-grow">
+                <table class="text-right" id="comprehensiveTable">
+                    <thead class="bg-indigo-100 border-b"></thead>
+                    <tbody id="comprehensiveTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- التطبيق الرئيسي -->
+    <div id="mainApp" class="max-w-[1400px] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden hidden">
+        <div class="bg-gradient-to-l from-purple-800 to-indigo-600 p-6 text-white flex justify-between items-center">
+            <div>
+                <h1 class="text-xl md:text-2xl font-extrabold mb-1">سيستم عماد صموئيل لرصد درجات أعمال السنة</h1>
+                <h2 class="text-lg md:text-xl font-bold text-yellow-300" id="headerSchoolName">اسم المدرسة</h2>
+                <p class="text-blue-100 opacity-90 text-sm" id="headerAdminName">إدارة التعليم</p>
+            </div>
+            <button onclick="openSettings()" class="bg-white/20 hover:bg-white/30 p-3 rounded-xl transition" title="الإعدادات">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+        </div>
+
+        <div class="p-4 md:p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <div>
+                    <label class="block text-sm font-semibold mb-1 text-indigo-800">اسم المعلم (مطلوب)</label>
+                    <input type="text" id="teacherNameInput" class="w-full p-3 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 font-semibold" placeholder="اكتب اسمك هنا...">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1 text-indigo-800">المادة (متزامنة تلقائياً)</label>
+                    <input type="text" id="subjectNameInput" class="w-full p-3 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 font-semibold bg-gray-100" placeholder="اختر المادة من القائمة بالأسفل" readonly>
+                </div>
+            </div>
+
+            <div class="mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <h3 class="font-bold text-gray-700 mb-2 text-lg">تعبئة أسماء الطلاب</h3>
+                <p class="text-xs text-gray-500 mb-2">طريقة مضمونة 100%: في ملف الإكسيل، اجعل العمود (A) للأسماء، والعمود (B) للفصل، والعمود (C) للهاتف. ثم احفظ الملف وارفعه هنا:</p>
+                
+                <div class="flex flex-col md:flex-row gap-3 mb-3">
+                    <label class="flex-1 bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 cursor-pointer text-center">
+                        📂 رفع ملف Excel
+                        <input type="file" id="excelFileInput" class="hidden" accept=".xlsx, .xls">
+                    </label>
+                </div>
+
+                <p class="text-xs text-gray-500 mb-2 mt-2">أو يمكنك لصق البيانات يدوياً (انسخ من الإكسيل والصق هنا):</p>
+                <textarea id="pasteArea" class="w-full h-24 p-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-3 text-sm" placeholder="الصق البيانات هنا..."></textarea>
+                <button id="importBtn" onclick="importPastedData()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700">تعبئة الكشف باللصق</button>
+            </div>
+
+            <div id="studentTools">
+                <div class="flex flex-wrap gap-3 mb-6 border-t border-b py-4 items-center">
+                    <select id="classFilter" onchange="renderGrades()" class="p-2 border rounded-lg font-semibold focus:ring-2 focus:ring-indigo-500">
+                        <option value="">كل الفصول</option>
+                    </select>
+                    
+                    <select id="monthSelect" onchange="onMonthChange()" class="p-2 border-2 border-purple-500 rounded-lg font-bold focus:ring-2 focus:ring-purple-500 bg-purple-50 text-purple-800">
+                        <option value="سبتمبر">شهر: سبتمبر</option>
+                        <option value="أكتوبر">شهر: أكتوبر</option>
+                        <option value="نوفمبر">شهر: نوفمبر</option>
+                        <option value="ديسمبر">شهر: ديسمبر</option>
+                        <option value="فبراير">شهر: فبراير</option>
+                        <option value="مارس">شهر: مارس</option>
+                        <option value="أبريل">شهر: أبريل</option>
+                        <option value="مايو">شهر: مايو</option>
+                    </select>
+
+                    <button onclick="toggleLockMonth()" id="monthLockBtn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-semibold text-sm">🔒 قفل الشهر</button>
+
+                    <select id="teacherSubjectSelect" onchange="onSubjectChange()" class="p-2 border-2 border-indigo-500 rounded-lg font-bold focus:ring-2 focus:ring-indigo-500 bg-indigo-50 text-indigo-800">
+                        <option value="لغة عربية">رصد: لغة عربية</option>
+                        <option value="رياضيات">رصد: رياضيات</option>
+                        <option value="لغة انجليزية">رصد: لغة انجليزية</option>
+                        <option value="علوم">رصد: علوم</option>
+                        <option value="دراسات">رصد: دراسات</option>
+                        <option value="تربية دينية">رصد: تربية دينية</option>
+                        <option value="حاسب آلي">رصد: حاسب آلي</option>
+                        <option value="المستوى">رصد: المستوى</option>
+                        <option value="اللغة الثانية">رصد: اللغة الثانية</option>
+                    </select>
+                    
+                    <button onclick="saveAndLockSubject()" id="saveSubjectBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">📨 حفظ وإرسال المادة</button>
+
+                    <button onclick="toggleGradingTable()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-semibold">📝 إظهار كشف الرصد</button>
+                    <button onclick="openComprehensiveModal()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-semibold">📊 كشف الشامل للشهر</button>
+                    
+                    <button id="addStudentBtn" onclick="addStudents(1)" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 font-semibold opacity-50 cursor-not-allowed" disabled>➕ إضافة طالب</button>
+                    <button onclick="toggleAdminEditMode()" id="adminLockBtn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 font-semibold">🔐 إدارة الطلاب (للمدير)</button>
+                    <button onclick="toggleParentPortal()" id="portalToggleBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-semibold">🔒 فتح بوابة الأولياء</button>
+                    
+                    <button onclick="exportToExcel()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-semibold mr-auto">💾 تصدير Excel للمادة</button>
+                </div>
+
+                <div id="printableGrades" class="hidden bg-white p-4 rounded-xl">
+                    <div class="text-center mb-4">
+                        <h2 class="text-xl font-bold" id="pdfSchoolName">اسم المدرسة</h2>
+                        <p class="text-md" id="pdfAdminName">إدارة التعليم</p>
+                        <p class="text-sm font-semibold">كشف درجات شهر: <span id="pdfMonth" class="text-purple-600 font-bold">-</span> | المعلم: <span id="pdfTeacher">-</span> | المادة: <span id="pdfSubject">-</span></p>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="text-right" id="gradesTable">
+                            <thead class="bg-gray-50 border-b"></thead>
+                            <tbody id="studentsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. بوابة أولياء الأمور -->
+    <div id="parentPortalScreen" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">بوابة أولياء الأمور</h2>
+            <p class="text-gray-500 mb-6">الرجاء إدخال رقم هاتف ولي الأمر المسجل لعرض درجات ابنك.</p>
+            <input type="tel" id="parentPhoneInput" class="w-full p-3 border rounded-xl mb-4 text-center text-xl tracking-widest focus:ring-2 focus:ring-green-500" placeholder="01XXXXXXXXX">
+            <button onclick="searchParentGrades()" class="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 text-lg">عرض الدرجات</button>
+            <p id="parentError" class="text-red-500 mt-3 hidden font-semibold">رقم الهاتف غير مسجل في النظام!</p>
+            <button onclick="closeParentPortal()" class="w-full mt-4 text-gray-500 font-semibold py-2 hover:text-gray-800 transition">عودة للصفحة الرئيسية</button>
+        </div>
+    </div>
+    
+    <!-- 7. شاشة شهادة الطالب لولي الأمر -->
+    <div id="parentViewScreen" class="hidden fixed inset-0 bg-gray-100 z-50 overflow-y-auto p-4 flex-col items-center">
+        <div class="w-full max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-xl mt-10 border-4 border-double border-indigo-200">
+            <div class="text-center mb-6 border-b-2 border-indigo-100 pb-4">
+                <h1 class="text-2xl font-extrabold text-gray-800" id="parentSchoolName">اسم المدرسة</h1>
+                <p class="text-md text-gray-500 mb-4" id="parentAdminName">إدارة التعليم</p>
+                <h2 class="text-xl font-bold text-indigo-800">كشف درجات شهر: <span id="parentCurrentMonth" class="text-purple-600">-</span></h2>
+            </div>
+            <div class="flex justify-between items-center mb-6 bg-gray-50 p-3 rounded-lg flex-wrap gap-2">
+                <div class="text-right">
+                    <p class="text-lg font-bold text-gray-800">اسم الطالب: <span id="parentStudentName">-</span></p>
+                    <p class="text-sm text-gray-500">الفصل: <span id="parentStudentClass">-</span></p>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <select id="parentMonthSelect" onchange="onParentMonthChange()" class="p-2 border-2 border-purple-500 rounded-lg font-bold focus:ring-2 focus:ring-purple-500 bg-purple-50 text-purple-800 text-sm"></select>
+                    <button onclick="exitParentView()" class="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 text-sm">خروج</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-right border-collapse mb-4 min-w-[600px]">
+                    <thead id="parentGradesHead" class="bg-indigo-50"></thead>
+                    <tbody id="parentGradesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ====== 1. نظام التفعيل والبيانات ======
+        const OWNER_MASTER_KEY = "EMAD-OWNER"; 
+        const SCHOOL_SUBJECTS = ["لغة عربية", "رياضيات", "لغة انجليزية", "علوم", "دراسات", "تربية دينية", "حاسب آلي", "المستوى", "اللغة الثانية"];
+        const MONTHS = ["سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر", "فبراير", "مارس", "أبريل", "مايو"];
+        let appData = { schoolInfo: { name: "", admin: "" }, students: [], rasmNames: ["رصد 1", "رصد 2", "رصد 3", "رصد 4", "رصد 5", "رصد 6", "رصد 7", "رصد 8", "رصد 9", "رصد 10"], parentPortalOpen: false, lockedMonths: [], lockedSubjects: {} };
+        let adminEditMode = false;
+        let currentParentStudent = null;
+
+        function ensureStudentGrades(student, month, subject) {
+            if (!student.grades) student.grades = {};
+            if (!student.grades[month]) student.grades[month] = {};
+            if (!student.grades[month][subject] || student.grades[month][subject].length < 10) {
+                let arr = student.grades[month][subject] || [];
+                while(arr.length < 10) arr.push("");
+                student.grades[month][subject] = arr;
+            }
+        }
+
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('emad_grades_direct_app_v17');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    appData = {
+                        schoolInfo: parsed.schoolInfo || { name: "", admin: "" },
+                        students: parsed.students || [],
+                        rasmNames: parsed.rasmNames || ["رصد 1", "رصد 2", "رصد 3", "رصد 4", "رصد 5", "رصد 6", "رصد 7", "رصد 8", "رصد 9", "رصد 10"],
+                        parentPortalOpen: parsed.parentPortalOpen || false,
+                        lockedMonths: parsed.lockedMonths || [],
+                        lockedSubjects: parsed.lockedSubjects || {}
+                    };
+                }
+            } catch (e) { 
+                appData = { schoolInfo: { name: "", admin: "" }, students: [], rasmNames: ["رصد 1", "رصد 2", "رصد 3", "رصد 4", "رصد 5", "رصد 6", "رصد 7", "رصد 8", "رصد 9", "رصد 10"], parentPortalOpen: false, lockedMonths: [], lockedSubjects: {} }; 
+            }
+        }
+        function saveData() { localStorage.setItem('emad_grades_direct_app_v17', JSON.stringify(appData)); }
+
+        function checkLicense() {
+            if (localStorage.getItem('emad_is_owner_license') === 'true') return true;
+            const expiryStr = localStorage.getItem('emad_license_expiry');
+            if (!expiryStr) return false;
+            if (new Date() > new Date(expiryStr)) { localStorage.removeItem('emad_license_expiry'); return false; }
+            return true;
+        }
+
+        function encodeBase64(str) { return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1))); }
+        function decodeBase64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+
+        function activateLicense() {
+            const input = document.getElementById('licenseInput').value.trim();
+            if (input === OWNER_MASTER_KEY) {
+                localStorage.setItem('emad_is_owner_license', 'true');
+                sessionStorage.setItem('emad_app_logged', 'true');
+                sessionStorage.setItem('emad_is_owner', 'true');
+                appData.schoolInfo = { name: "نسخة المالك - مفتوحة", admin: "EMAD OWNER" };
+                saveData(); alert('مرحباً بك مالك البرنامج!'); location.reload(); return;
+            }
+            try {
+                const decoded = decodeBase64(input).split('').reverse().join('');
+                const parts = decoded.split('|');
+                if (parts.length === 3 && parts[0].startsWith("EMAD-LIC-")) {
+                    const expiryStr = parts[0].replace("EMAD-LIC-", "");
+                    if (new Date(expiryStr) > new Date()) {
+                        localStorage.setItem('emad_license_expiry', expiryStr);
+                        appData.schoolInfo = { name: parts[1], admin: parts[2] };
+                        saveData();
+                        alert(`تم تفعيل البرنامج!\n${parts[1]}\nصالح حتى: ${expiryStr}`); location.reload();
+                    } else { document.getElementById('licenseError').classList.remove('hidden'); }
+                } else { document.getElementById('licenseError').classList.remove('hidden'); }
+            } catch (e) { document.getElementById('licenseError').classList.remove('hidden'); }
+        }
+
+        function toggleTrialInputs() { document.getElementById('trialInfoHide').classList.toggle('hidden', parseInt(document.getElementById('licenseDays').value) <= 3); }
+        function generateKey() {
+            const days = parseInt(document.getElementById('licenseDays').value);
+            let school, admin;
+            if (days <= 3) { school = "نسخة تجريبية"; admin = "Trial"; } 
+            else {
+                school = document.getElementById('genSchoolName').value.trim();
+                admin = document.getElementById('genAdminName').value.trim();
+                if (!school || !admin) { alert('اكتب اسم المدرسة والإدارة'); return; }
+            }
+            const expiryDate = new Date(); expiryDate.setDate(expiryDate.getDate() + days);
+            const rawStr = `EMAD-LIC-${expiryDate.toISOString().split('T')[0]}|${school}|${admin}`;
+            document.getElementById('generatedKey').value = encodeBase64(rawStr.split('').reverse().join(''));
+        }
+        function copyKey() { document.getElementById('generatedKey').select(); document.execCommand('copy'); alert('تم النسخ!'); }
+
+        // ====== 2. نظام الحماية ======
+        let userPassword = localStorage.getItem('emad_user_pass') || '1234';
+        let isLoggedIn = sessionStorage.getItem('emad_app_logged') === 'true';
+        let isOwnerLoggedIn = sessionStorage.getItem('emad_is_owner') === 'true';
+
+        function show(id) { const el = document.getElementById(id); el.style.display = 'flex'; el.classList.remove('hidden'); }
+        function hide(id) { const el = document.getElementById(id); el.style.display = 'none'; el.classList.add('hidden'); }
+
+        function checkAuth() {
+            try {
+                if (!checkLicense()) { show('licenseScreen'); hide('adminSetupScreen'); hide('loginScreen'); hide('mainApp'); return; }
+                hide('licenseScreen');
+                if (!localStorage.getItem('emad_admin_pass')) { show('adminSetupScreen'); hide('loginScreen'); hide('mainApp'); return; }
+                hide('adminSetupScreen');
+                
+                const sName = appData.schoolInfo.name || "نظام الدرجات";
+                const aName = appData.schoolInfo.admin || "إدارة التعليم";
+                document.getElementById('headerSchoolName').textContent = sName;
+                document.getElementById('headerAdminName').textContent = aName;
+                document.getElementById('pdfSchoolName').textContent = sName;
+                document.getElementById('pdfAdminName').textContent = aName;
+
+                if (isLoggedIn) {
+                    if (isOwnerLoggedIn) adminEditMode = true; 
+                    else adminEditMode = false;
+                    updateAdminLockUI();
+                    updatePortalToggleUI();
+                    onSubjectChange();
+                    updateMonthLockUI();
+                    hide('loginScreen'); show('mainApp'); populateClassFilter(); 
+                } 
+                else { show('loginScreen'); hide('mainApp'); }
+            } catch (e) { alert("خطأ في البيانات. إعادة ضبط."); localStorage.clear(); location.reload(); }
+        }
+
+        function saveAdminPass() {
+            const pass = document.getElementById('setupAdminPass').value.trim();
+            if (pass.length < 4) { alert('كلمة المرور قصيرة.'); return; }
+            localStorage.setItem('emad_admin_pass', pass); alert('تم الحفظ!'); checkAuth();
+        }
+
+        function tryLogin() {
+            const input = document.getElementById('passwordInput').value;
+            if (input === userPassword || input === OWNER_MASTER_KEY) {
+                sessionStorage.setItem('emad_app_logged', 'true'); isLoggedIn = true;
+                isOwnerLoggedIn = (input === OWNER_MASTER_KEY);
+                sessionStorage.setItem('emad_is_owner', isOwnerLoggedIn ? 'true' : 'false');
+                document.getElementById('loginError').classList.remove('hidden');
+                document.getElementById('passwordInput').value = ''; checkAuth();
+            } else { document.getElementById('loginError').classList.remove('hidden'); }
+        }
+
+        function cancelLogout() { hide('loginScreen'); show('mainApp'); if(!isLoggedIn) { isLoggedIn = true; sessionStorage.setItem('emad_app_logged', 'true'); } }
+        document.addEventListener('keypress', (e) => { if (e.key === 'Enter') { if (document.getElementById('licenseScreen').style.display !== 'none') activateLicense(); else if (!isLoggedIn && document.getElementById('loginScreen').style.display !== 'none') tryLogin(); } });
+
+        function openSettings() { document.getElementById('ownerTools').classList.toggle('hidden', !isOwnerLoggedIn); document.getElementById('settingsModal').classList.remove('hidden'); }
+        function safeLogout() { if (confirm("حفظ وقفل البرنامج؟")) { saveData(); sessionStorage.removeItem('emad_app_logged'); isLoggedIn = false; isOwnerLoggedIn = false; adminEditMode = false; document.getElementById('settingsModal').classList.add('hidden'); checkAuth(); } }
+        function clearDataPrompt() {
+            const pass = prompt("إدخال كلمة مرور المدير للمسح:");
+            if (pass === null) return;
+            if (pass === localStorage.getItem('emad_admin_pass') || pass === OWNER_MASTER_KEY) {
+                if (confirm("تحذير: مسح جميع الطلاب والدرجات؟")) {
+                    appData.students = []; appData.lockedSubjects = {};
+                    saveData(); populateClassFilter(); renderGrades();
+                    document.getElementById('settingsModal').classList.add('hidden'); alert("تم المسح.");
+                }
+            } else { alert("كلمة مرور خاطئة!"); }
+        }
+
+        // ====== 3. نظام حماية بيانات الطلاب والبوابة والشهور ======
+        function toggleAdminEditMode() {
+            if (adminEditMode) {
+                adminEditMode = false;
+                updateAdminLockUI();
+                renderGrades();
+                return;
+            }
+            const pass = prompt("الرجاء إدخال كلمة مرور المدير لفتح تعديل بيانات الطلاب ومسميات الرصد:");
+            if (pass === null) return;
+            if (pass === localStorage.getItem('emad_admin_pass') || pass === OWNER_MASTER_KEY) {
+                adminEditMode = true;
+                updateAdminLockUI();
+                renderGrades();
+                alert("تم فتح وضع التعديل. يمكنك الآن تعديل مسميات الأعمدة وبيانات الطلاب.");
+            } else { alert("كلمة مرور خاطئة!"); }
+        }
+
+        function updateAdminLockUI() {
+            const isLocked = !adminEditMode;
+            document.getElementById('addStudentBtn').disabled = isLocked;
+            if (isLocked) {
+                document.getElementById('addStudentBtn').classList.add('opacity-50','cursor-not-allowed');
+                document.getElementById('adminLockBtn').innerText = "🔐 إدارة الطلاب (للمدير)";
+            } else {
+                document.getElementById('addStudentBtn').classList.remove('opacity-50','cursor-not-allowed');
+                document.getElementById('adminLockBtn').innerText = "🔒 قفل تعديل الطلاب";
+            }
+        }
+
+        function saveAndLockSubject() {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            if (!confirm(`هل أنت متأكد من حفظ وإرسال درجات مادة ${selectedSubject} لشهر ${selectedMonth}؟\nسيتم قفل الدرجات التي تم إدخالها فقط، وتظل الخلايا الفارغة مفتوحة.`)) return;
+
+            if (!appData.lockedSubjects[selectedMonth]) appData.lockedSubjects[selectedMonth] = [];
+            if (!appData.lockedSubjects[selectedMonth].includes(selectedSubject)) {
+                appData.lockedSubjects[selectedMonth].push(selectedSubject);
+            }
+            saveData();
+            updateSaveSubjectBtnUI();
+            renderGrades();
+            alert('تم حفظ وإرسال المادة بنجاح!');
+        }
+
+        function unlockSubject() {
+            const pass = prompt("لفتح تعديل مادة محفوظة، أدخل كلمة مرور المدير:");
+            if (pass !== localStorage.getItem('emad_admin_pass') && pass !== OWNER_MASTER_KEY) { alert("كلمة مرور خاطئة!"); return; }
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            if (appData.lockedSubjects[selectedMonth]) {
+                const index = appData.lockedSubjects[selectedMonth].indexOf(selectedSubject);
+                if (index > -1) {
+                    appData.lockedSubjects[selectedMonth].splice(index, 1);
+                    saveData(); updateSaveSubjectBtnUI(); renderGrades();
+                    alert(`تم فتح مادة ${selectedSubject} للتعديل.`);
+                }
+            }
+        }
+
+        function updateSaveSubjectBtnUI() {
+            const btn = document.getElementById('saveSubjectBtn');
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            const isSubLocked = appData.lockedSubjects[selectedMonth] && appData.lockedSubjects[selectedMonth].includes(selectedSubject);
+
+            if (isSubLocked) {
+                btn.innerText = "✅ تم إرسال المادة (مقفلة)";
+                btn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                btn.onclick = null;
+                if (adminEditMode) {
+                    btn.innerText = "🔓 فتح المادة (مدير)";
+                    btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    btn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                    btn.onclick = unlockSubject;
+                }
+            } else {
+                btn.innerText = "📨 حفظ وإرسال المادة";
+                btn.classList.remove('bg-gray-400', 'cursor-not-allowed', 'bg-yellow-500', 'hover:bg-yellow-600');
+                btn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                btn.setAttribute('onclick', 'saveAndLockSubject()');
+            }
+        }
+
+        function toggleParentPortal() {
+            const pass = prompt("الرجاء إدخال كلمة مرور المدير لفتح/إغلاق بوابة أولياء الأمور:");
+            if (pass === null) return;
+            if (pass === localStorage.getItem('emad_admin_pass') || pass === OWNER_MASTER_KEY) {
+                appData.parentPortalOpen = !appData.parentPortalOpen;
+                saveData(); updatePortalToggleUI();
+                alert(appData.parentPortalOpen ? "تم فتح البوابة لأولياء الأمور." : "تم إغلاق البوابة.");
+            } else { alert("كلمة مرور خاطئة!"); }
+        }
+
+        function updatePortalToggleUI() {
+            const btn = document.getElementById('portalToggleBtn');
+            if (appData.parentPortalOpen) {
+                btn.innerText = "🔓 إغلاق بوابة الأولياء";
+                btn.classList.remove('bg-red-500', 'hover:bg-red-600'); btn.classList.add('bg-green-500', 'hover:bg-green-600');
+            } else {
+                btn.innerText = "🔒 فتح بوابة الأولياء";
+                btn.classList.remove('bg-green-500', 'hover:bg-green-600'); btn.classList.add('bg-red-500', 'hover:bg-red-600');
+            }
+        }
+
+        function tryOpenParentPortal() { if (!appData.parentPortalOpen) { alert("بوابة أولياء الأمور مغلقة حالياً."); return; } hide('loginScreen'); show('parentPortalScreen'); }
+
+        function toggleLockMonth() {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const pass = prompt(`تغيير حالة قفل شهر ${selectedMonth}.\nالرجاء إدخال كلمة مرور المدير:`);
+            if (pass === null) return;
+            if (pass === localStorage.getItem('emad_admin_pass') || pass === OWNER_MASTER_KEY) {
+                const index = appData.lockedMonths.indexOf(selectedMonth);
+                if (index > -1) { appData.lockedMonths.splice(index, 1); alert(`تم فتح شهر ${selectedMonth} للتعديل.`); } 
+                else { appData.lockedMonths.push(selectedMonth); alert(`تم قفل شهر ${selectedMonth}. لا يمكن التعديل عليه الآن.`); }
+                saveData(); updateMonthLockUI(); renderGrades();
+            } else { alert("كلمة مرور خاطئة!"); }
+        }
+
+        function updateMonthLockUI() {
+            const btn = document.getElementById('monthLockBtn');
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const isLocked = appData.lockedMonths.includes(selectedMonth);
+            if (isLocked) {
+                btn.innerText = `🔓 فتح شهر ${selectedMonth}`;
+                btn.classList.remove('bg-green-500', 'hover:bg-green-600'); btn.classList.add('bg-red-500', 'hover:bg-red-600');
+            } else {
+                btn.innerText = `🔒 قفل شهر ${selectedMonth}`;
+                btn.classList.remove('bg-red-500', 'hover:bg-red-600'); btn.classList.add('bg-green-500', 'hover:bg-green-600');
+            }
+        }
+
+        // ====== 4. محرك استيراد الإكسيل (بالأعمدة المباشرة) ======
+        document.getElementById('excelFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const sheet = wb.Sheets[wb.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    let importedCount = 0;
+                    const newStudents = [];
+                    let baseId = Date.now();
+
+                    rows.forEach((row, index) => {
+                        let name = String(row[0]||"").trim();   // العمود الأول (A)
+                        let className = String(row[1]||"").trim(); // العمود الثاني (B)
+                        let phone = String(row[2]||"").trim();   // العمود الثالث (C)
+
+                        if (index === 0 && (name.includes("اسم") || name.toLowerCase().includes("name"))) return;
+                        
+                        name = name.replace(/\*/g, '').trim();
+                        if (name.length < 2) return;
+
+                        newStudents.push({ 
+                            id: 'stud_' + (baseId + index), 
+                            name, 
+                            className: className || "بدون فصل", 
+                            phone, 
+                            grades: {} // فارغ لتوفير الذاكرة
+                        });
+                        importedCount++;
+                    });
+
+                    if (importedCount > 0) {
+                        appData.students = appData.students.concat(newStudents);
+                        saveData(); 
+                        populateClassFilter();
+                        alert(`تم استيراد ${importedCount} طالب بنجاح!`);
+                        if(!document.getElementById('printableGrades').classList.contains('hidden')) renderGrades();
+                    } else {
+                        alert("لم يتم العثور على أسماء في العمود الأول (A) بالملف.");
+                    }
+                    e.target.value = '';
+                } catch (err) {
+                    alert("خطأ في قراءة الملف: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // ====== 4.1 محرك اللصق المباشر (سريع جداً) ======
+        function importPastedData() {
+            const text = document.getElementById('pasteArea').value.trim();
+            if (!text) return alert("الرجاء لصق البيانات أولاً");
+            
+            const lines = text.split(/\r?\n/);
+            let importedCount = 0;
+            const newStudents = [];
+            let baseId = Date.now();
+
+            lines.forEach((line, index) => {
+                if (!line.trim()) return;
+                let parts = line.split('\t'); // القسمة بالتاب المباشر من إكسيل
+                if (parts.length === 1) {
+                    parts = line.split(/\s{2,}/); // إذا لم يوجد تاب، يقسم بمسافتين
+                }
+                
+                let name = parts[0] ? parts[0].trim() : "";
+                if (index === 0 && (name.includes("اسم") || name.toLowerCase().includes("name"))) return;
+                
+                name = name.replace(/\*/g, '').trim();
+                if (name.length < 2) return;
+
+                let className = parts.length > 1 ? parts[1].replace(/\*/g, '').trim() : "بدون فصل";
+                let phone = parts.length > 2 ? parts[2].replace(/\*/g, '').trim() : "";
+
+                newStudents.push({ 
+                    id: 'stud_' + (baseId + index), 
+                    name, 
+                    className, 
+                    phone, 
+                    grades: {} // فارغ لتوفير الذاكرة
+                });
+                importedCount++;
+            });
+
+            if (importedCount > 0) {
+                appData.students = appData.students.concat(newStudents);
+                saveData(); 
+                populateClassFilter();
+                document.getElementById('pasteArea').value = '';
+                alert(`تم استيراد ${importedCount} طالب بنجاح!`);
+                if(!document.getElementById('printableGrades').classList.contains('hidden')) renderGrades();
+            } else {
+                alert("لم يتم العثور على بيانات صالحة.");
+            }
+        }
+
+        function populateClassFilter() {
+            const classes = [...new Set(appData.students.map(s => s.className).filter(c => c && c !== "بدون فصل"))];
+            const selector = document.getElementById('classFilter');
+            selector.innerHTML = '<option value="">كل الفصول</option>';
+            classes.forEach(c => selector.innerHTML += `<option value="${c}">${c}</option>`);
+        }
+
+        function addStudents(count) {
+            if (!adminEditMode) { alert("الرجاء فتح صلاحيات المدير أولاً."); return; }
+            for (let i = 0; i < count; i++) {
+                appData.students.push({ id: 'stud_' + Date.now() + '_' + Math.random(), name: "", className: "", phone: "", grades: {} });
+            }
+            saveData(); populateClassFilter(); renderGrades();
+        }
+
+        function updateStudentField(id, field, value) {
+            if (!adminEditMode) return;
+            const student = appData.students.find(s => s.id === id);
+            if (student) { 
+                student[field] = value; saveData(); 
+                if (field === 'className') populateClassFilter(); 
+            }
+        }
+
+        function updateRasmName(index, value) {
+            if (!adminEditMode) return;
+            appData.rasmNames[index] = value.trim() || `رصد ${index+1}`;
+            saveData();
+        }
+
+        function updateGrade(studentId, colIndex, inputElement) {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            const isMonthLocked = appData.lockedMonths.includes(selectedMonth);
+            
+            if (!adminEditMode && isMonthLocked) {
+                alert(`إجراء مرفوض: شهر ${selectedMonth} مقفل.`); renderGrades(); return;
+            }
+
+            const value = inputElement.value;
+            const student = appData.students.find(s => s.id === studentId);
+            if (student) {
+                ensureStudentGrades(student, selectedMonth, selectedSubject);
+                student.grades[selectedMonth][selectedSubject][colIndex] = value; 
+                saveData();
+            }
+        }
+
+        function deleteStudent(id) {
+            if (!adminEditMode) { alert("الرجاء فتح صلاحيات المدير أولاً."); return; }
+            appData.students = appData.students.filter(s => s.id !== id); saveData(); populateClassFilter(); renderGrades();
+        }
+
+        function handleEnter(event, currentInput) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if(currentInput.onchange) currentInput.onchange();
+                
+                const currentTd = currentInput.closest('td');
+                const nextTd = currentTd.nextElementSibling;
+                if (nextTd) {
+                    const nextInput = nextTd.querySelector('input');
+                    if (nextInput && !nextInput.hasAttribute('readonly')) { nextInput.focus(); if(nextInput.type === 'number') nextInput.select(); return; }
+                }
+                const currentTr = currentInput.closest('tr');
+                const nextTr = currentTr.nextElementSibling;
+                if (nextTr) {
+                    const inputs = nextTr.querySelectorAll('input');
+                    for(let inp of inputs) { if(!inp.hasAttribute('readonly') && inp.type === 'number') { inp.focus(); inp.select(); return; } }
+                }
+            }
+        }
+
+        function toggleGradingTable() {
+            const tableDiv = document.getElementById('printableGrades');
+            if (tableDiv.classList.contains('hidden')) { renderGrades(); tableDiv.classList.remove('hidden'); } 
+            else { tableDiv.classList.add('hidden'); }
+        }
+
+        function onSubjectChange() {
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            document.getElementById('subjectNameInput').value = selectedSubject;
+            updateSaveSubjectBtnUI();
+            renderGrades();
+        }
+
+        function onMonthChange() {
+            updateMonthLockUI();
+            updateSaveSubjectBtnUI();
+            renderGrades();
+        }
+
+        function renderGrades() {
+            const tableHead = document.querySelector('#gradesTable thead');
+            const tableBody = document.getElementById('studentsTableBody');
+            const filterValue = document.getElementById('classFilter').value;
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const studentsToRender = filterValue ? appData.students.filter(s => s.className === filterValue) : appData.students;
+
+            document.getElementById('pdfMonth').textContent = selectedMonth;
+            document.getElementById('pdfSubject').textContent = selectedSubject;
+
+            const isLocked = !adminEditMode;
+            const lockAttr = isLocked ? 'readonly' : '';
+            const lockClass = isLocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white';
+
+            let headHTML = `<tr>
+                <th class="p-1 font-semibold text-gray-600 sticky-col-1 bg-gray-50" style="width: 30px;">#</th>
+                <th class="p-1 font-semibold text-gray-600 sticky-col-2 bg-gray-50" style="width: 120px;">اسم الطالب</th>
+                <th class="p-1 font-semibold text-gray-600 bg-gray-50" style="width: 50px;">الفصل</th>`;
+            appData.rasmNames.forEach((rasm, index) => {
+                headHTML += `<th class="p-1 font-semibold text-gray-600 text-center bg-indigo-50">
+                    <input type="text" value="${rasm}" onchange="updateRasmName(${index}, this.value)" ${lockAttr} class="head-input border rounded text-center font-semibold focus:ring-1 focus:ring-indigo-500 ${lockClass}">
+                </th>`;
+            });
+            headHTML += `</tr>`;
+            tableHead.innerHTML = headHTML;
+
+            const isMonthLocked = appData.lockedMonths.includes(selectedMonth);
+            const isSubLocked = appData.lockedSubjects[selectedMonth] && appData.lockedSubjects[selectedMonth].includes(selectedSubject);
+
+            let allRowsHTML = "";
+            studentsToRender.forEach((student, index) => {
+                ensureStudentGrades(student, selectedMonth, selectedSubject);
+                
+                let rowHTML = `<tr class="border-b hover:bg-indigo-50/50">
+                    <td class="p-1 text-center text-gray-500 text-sm sticky-col-1 bg-white">${index + 1}</td>
+                    <td class="p-1 sticky-col-2 bg-white" style="word-wrap: break-word;">
+                        <input type="text" value="${student.name}" onchange="updateStudentField('${student.id}', 'name', this.value)" onkeydown="handleEnter(event, this)" ${lockAttr} class="w-full p-1 border rounded text-sm focus:ring-1 focus:ring-indigo-500 font-semibold ${lockClass}">
+                    </td>
+                    <td class="p-1 bg-white">
+                        <input type="text" value="${student.className}" onchange="updateStudentField('${student.id}', 'className', this.value)" onkeydown="handleEnter(event, this)" ${lockAttr} class="w-full p-1 border rounded text-sm text-center focus:ring-1 focus:ring-indigo-500 ${lockClass}">
+                    </td>`;
+                
+                student.grades[selectedMonth][selectedSubject].forEach((grade, idx) => {
+                    let cellLocked = false;
+                    let cellClass = 'bg-white';
+                    
+                    if (isMonthLocked) {
+                        cellLocked = true;
+                        cellClass = 'bg-gray-200 text-gray-500 cursor-not-allowed';
+                    } else if (!adminEditMode && isSubLocked) {
+                        if (grade !== "" && grade !== null && grade !== undefined) {
+                            cellLocked = true;
+                            cellClass = 'bg-gray-300 text-gray-600 cursor-not-allowed';
+                        }
+                    }
+
+                    rowHTML += `<td class="p-1 text-center">
+                        <input type="number" step="any" value="${grade || ''}"
+                        onchange="updateGrade('${student.id}', ${idx}, this)"
+                        onkeydown="handleEnter(event, this)"
+                        ${cellLocked ? 'readonly' : ''}
+                        class="grade-input border rounded text-center focus:ring-1 focus:ring-indigo-500 ${cellClass}">
+                    </td>`;
+                });
+                allRowsHTML += rowHTML;
+            });
+
+            tableBody.innerHTML = allRowsHTML;
+            document.getElementById('pdfTeacher').textContent = document.getElementById('teacherNameInput').value;
+        }
+
+        // ====== 5. الكشف الشامل ======
+        function openComprehensiveModal() {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            document.getElementById('compMonthLabel').textContent = selectedMonth;
+            
+            const tableHead = document.querySelector('#comprehensiveTable thead');
+            const tableBody = document.getElementById('comprehensiveTableBody');
+            
+            let headHTML = `<tr><th class="p-2 font-semibold text-gray-700 sticky-col-1 bg-indigo-100" style="width: 150px;">اسم الطالب</th>`;
+            SCHOOL_SUBJECTS.forEach(sub => { headHTML += `<th class="p-2 font-semibold text-gray-700 text-center bg-indigo-100">${sub}</th>`; });
+            headHTML += `</tr>`;
+            tableHead.innerHTML = headHTML;
+
+            let bodyHTML = "";
+            appData.students.forEach(student => {
+                bodyHTML += `<tr class="border-b hover:bg-indigo-50/50"><td class="p-2 font-semibold text-gray-800 sticky-col-1 bg-white">${student.name || '-'}</td>`;
+                SCHOOL_SUBJECTS.forEach(sub => {
+                    let sum = 0;
+                    if (student.grades && student.grades[selectedMonth] && student.grades[selectedMonth][sub]) {
+                        sum = student.grades[selectedMonth][sub].reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+                    }
+                    bodyHTML += `<td class="p-2 text-center font-bold ${sum > 0 ? 'text-indigo-600' : 'text-gray-300'}">${sum > 0 ? sum : '-'}</td>`;
+                });
+                bodyHTML += `</tr>`;
+            });
+            tableBody.innerHTML = bodyHTML;
+            document.getElementById('comprehensiveModal').classList.remove('hidden');
+        }
+
+        function exportComprehensiveToExcel() {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            if (appData.students.length === 0) { alert('لا يوجد طلاب'); return; }
+            const data = appData.students.map((s, i) => {
+                let row = { "الرقم": i + 1, "اسم الطالب": s.name, "الفصل": s.className };
+                SCHOOL_SUBJECTS.forEach(sub => { 
+                    let sum = 0;
+                    if (s.grades && s.grades[selectedMonth] && s.grades[selectedMonth][sub]) {
+                        sum = s.grades[selectedMonth][sub].reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+                    }
+                    row[sub] = sum; 
+                });
+                return row;
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `كشف ${selectedMonth}`);
+            XLSX.writeFile(wb, `الكشف_الشامل_${selectedMonth}.xlsx`);
+        }
+
+        // ====== 6. تصدير للمادة المحددة ======
+        function exportToExcel() {
+            const teacherName = document.getElementById('teacherNameInput').value.trim();
+            if (!teacherName) { alert('الرجاء كتابة اسم المعلم أولاً!'); return; }
+            const selectedSubject = document.getElementById('teacherSubjectSelect').value;
+            const selectedMonth = document.getElementById('monthSelect').value;
+            if (appData.students.length === 0) { alert('لا يوجد طلاب'); return; }
+            
+            const data = appData.students.map((s, i) => {
+                ensureStudentGrades(s, selectedMonth, selectedSubject);
+                let row = { "الرقم": i + 1, "اسم الطالب": s.name, "الفصل": s.className, "رقم الهاتف": s.phone };
+                s.grades[selectedMonth][selectedSubject].forEach((g, gIdx) => { row[appData.rasmNames[gIdx]] = g || ''; });
+                return row;
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `${selectedMonth} - ${selectedSubject}`);
+            XLSX.writeFile(wb, `درجات_${selectedSubject}_${selectedMonth}.xlsx`);
+        }
+
+        // ====== 7. نظام بوابة أولياء الأمور (محدث لتجاهل الصفر الزائد) ======
+        function closeParentPortal() { 
+            hide('parentPortalScreen'); 
+            document.getElementById('parentPhoneInput').value = ''; 
+            document.getElementById('parentError').classList.add('hidden'); 
+            checkAuth(); 
+        }
+
+        function normalizePhone(p) {
+            if (!p) return "";
+            let str = String(p).replace(/\D/g, ''); // إزالة أي مسافات أو رموز
+            if (str.startsWith('00')) str = str.substring(2);
+            else if (str.startsWith('20')) str = str.substring(2);
+            else if (str.startsWith('0')) str = str.substring(1);
+            return str;
+        }
+
+        function searchParentGrades() {
+            const phone = document.getElementById('parentPhoneInput').value.trim();
+            if (!phone) { alert('الرجاء إدخال رقم الهاتف'); return; }
+            
+            const normPhone = normalizePhone(phone);
+            const student = appData.students.find(s => normalizePhone(s.phone) === normPhone);
+            
+            if (student) {
+                currentParentStudent = student;
+                document.getElementById('parentSchoolName').textContent = appData.schoolInfo.name || "اسم المدرسة";
+                document.getElementById('parentAdminName').textContent = appData.schoolInfo.admin || "إدارة التعليم";
+                document.getElementById('parentStudentName').textContent = student.name;
+                document.getElementById('parentStudentClass').textContent = student.className;
+                
+                const monthSelect = document.getElementById('parentMonthSelect');
+                monthSelect.innerHTML = '';
+                let availableMonths = 0;
+                
+                MONTHS.forEach(month => {
+                    let hasGrades = false;
+                    SCHOOL_SUBJECTS.forEach(sub => { 
+                        if (student.grades && student.grades[month] && student.grades[month][sub] && student.grades[month][sub].some(g => g !== null && g !== undefined && g.toString().trim() !== "")) {
+                            hasGrades = true; 
+                        } 
+                    });
+                    if (hasGrades) {
+                        let opt = document.createElement('option'); 
+                        opt.value = month; 
+                        opt.innerText = month; 
+                        monthSelect.appendChild(opt); 
+                        availableMonths++;
+                    }
+                });
+                
+                if (availableMonths === 0) { 
+                    alert("لا توجد درجات مسجلة لهذا الطالب حتى الآن."); 
+                    return; 
+                }
+                
+                hide('parentPortalScreen'); 
+                show('parentViewScreen'); 
+                onParentMonthChange();
+            } else { 
+                document.getElementById('parentError').classList.remove('hidden'); 
+            }
+        }
+        
+        function onParentMonthChange() { 
+            const month = document.getElementById('parentMonthSelect').value; 
+            document.getElementById('parentCurrentMonth').textContent = month; 
+            renderParentGrades(currentParentStudent, month); 
+        }
+        
+        function renderParentGrades(student, month) {
+            let headHTML = `<tr class="border-b"><th class="p-3 font-semibold text-gray-700 w-1/8">المادة</th>`;
+            appData.rasmNames.forEach(rasm => { headHTML += `<th class="p-2 font-semibold text-gray-700 text-center text-sm">${rasm}</th>`; });
+            headHTML += `</tr>`;
+            document.getElementById('parentGradesHead').innerHTML = headHTML;
+            
+            let html = '';
+            SCHOOL_SUBJECTS.forEach(sub => {
+                let grades = [];
+                if (student.grades && student.grades[month] && student.grades[month][sub]) {
+                    grades = student.grades[month][sub];
+                }
+                const hasGrades = grades.some(g => g !== null && g !== undefined && g.toString().trim() !== "");
+                if (hasGrades) {
+                    html += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-semibold text-gray-800 bg-indigo-50/50">${sub}</td>`;
+                    for(let i=0; i<appData.rasmNames.length; i++){ 
+                        html += `<td class="p-3 text-center font-bold text-indigo-600">${grades[i] || '-'}</td>`; 
+                    }
+                    html += `</tr>`;
+                }
+            });
+            document.getElementById('parentGradesBody').innerHTML = html;
+        }
+        
+        function exitParentView() { 
+            hide('parentViewScreen'); 
+            document.getElementById('parentPhoneInput').value = ''; 
+            currentParentStudent = null; 
+            checkAuth(); 
+        }
+
+        // ====== 8. النسخ الاحتياطي والاستعادة ======
+        function backupData() {
+            let backup = { appData: appData };
+            let dataStr = JSON.stringify(backup);
+            let blob = new Blob([dataStr], { type: "application/json" });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url; a.download = "نسخة_احتياطية_درجات_أعمال_السنة.json"; a.click();
+            URL.revokeObjectURL(url);
+            alert("تم تحميل النسخة الاحتياطية بنجاح!");
+        }
+
+        document.getElementById('restoreFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; 
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let backup = JSON.parse(e.target.result);
+                    if (backup.appData) {
+                        let incoming = backup.appData;
+                        if (incoming.schoolInfo && (!appData.schoolInfo.name || appData.schoolInfo.name === "نظام الدرجات")) appData.schoolInfo = incoming.schoolInfo;
+                        if (incoming.rasmNames && appData.rasmNames.length === 0) appData.rasmNames = incoming.rasmNames;
+
+                        if (incoming.lockedSubjects) {
+                            if (!appData.lockedSubjects) appData.lockedSubjects = {};
+                            for (let month in incoming.lockedSubjects) {
+                                if (!appData.lockedSubjects[month]) appData.lockedSubjects[month] = [];
+                                incoming.lockedSubjects[month].forEach(sub => {
+                                    if (!appData.lockedSubjects[month].includes(sub)) appData.lockedSubjects[month].push(sub);
+                                });
+                            }
+                        }
+
+                        incoming.students.forEach(inStudent => {
+                            let existingStudent = appData.students.find(s => s.id === inStudent.id || s.name === inStudent.name);
+                            if (!existingStudent) {
+                                appData.students.push(inStudent);
+                            } else {
+                                MONTHS.forEach(month => {
+                                    if (inStudent.grades && inStudent.grades[month]) {
+                                        if (!existingStudent.grades) existingStudent.grades = {};
+                                        if (!existingStudent.grades[month]) existingStudent.grades[month] = {};
+                                        SCHOOL_SUBJECTS.forEach(sub => {
+                                            if (inStudent.grades[month][sub]) {
+                                                if(!existingStudent.grades[month][sub]) existingStudent.grades[month][sub] = Array(10).fill("");
+                                                inStudent.grades[month][sub].forEach((g, i) => {
+                                                    if (g !== "" && g !== null && g !== undefined) {
+                                                        existingStudent.grades[month][sub][i] = g;
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                        saveData();
+                        alert("تم استيراد ودمج الدرجات بنجاح! سيتم تحديث الصفحة.");
+                        location.reload();
+                    }
+                } catch (err) { alert("ملف النسخة الاحتياطية غير صالح."); }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        });
+
+        document.getElementById('teacherNameInput').addEventListener('input', () => { document.getElementById('pdfTeacher').textContent = document.getElementById('teacherNameInput').value; });
+
+        loadData(); toggleTrialInputs(); checkAuth();
+    </script>
+</body>
+</html>
